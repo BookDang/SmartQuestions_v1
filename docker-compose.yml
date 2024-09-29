@@ -1,0 +1,82 @@
+services:
+  # Add MongoDB service
+  mongodb:
+    container_name: sq-v1_mongodb
+    build: 
+      context: .
+      dockerfile: .docker/mongodb/Dockerfile
+    ports:
+      - "27017:27017"
+    networks:
+      - sq-backend
+    volumes:
+      - mongodb-data:/data/db
+      - ./.docker/mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: smartquestionsmongodb
+      MONGO_INITDB_DATABASE: sq_db_v1
+      # docker exec -it sq-mongodb mongo -u root -p smartquestionsmongodb --authenticationDatabase admin
+
+  nextjs:
+    container_name: sq-v1_nextjs
+    build:
+      context: .
+      # Path to the Dockerfile inside .docker/nextjs directory
+      dockerfile: .docker/nextjs/Dockerfile
+    ports:
+      - 3002:3002
+    volumes:
+      - ./nextjs:/app
+      - /app/node_modules
+    networks:
+      - sq-frontend
+      - sq-backend
+
+    depends_on:
+      - mongodb
+
+  # Add more services here
+  # Create new service for nestjs based on Dockerfile in .docker/nestjs directory
+  nestjs:
+    container_name: sq-v1_nestjs
+    build:
+      context: .
+      dockerfile: .docker/nestjs/Dockerfile
+    ports:
+      - 3003:3003
+    volumes:
+      - ./nestjs:/app
+      - /app/node_modules
+    networks:
+      - sq-backend
+    depends_on:
+      - mongodb
+
+  # Add Nginx service
+  nginx:
+    container_name: sq-v1_nginx
+    build:
+      context: .
+      dockerfile: .docker/nginx/Dockerfile
+    volumes:
+      - .docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - 80:80
+    depends_on:
+      - nextjs
+      - nestjs
+    networks:
+      - sq-frontend
+      - sq-backend
+
+# Add networks for frontend and backend services
+networks:
+  sq-frontend:
+    driver: bridge
+  sq-backend:
+    driver: bridge
+
+# Add volumes for MongoDB data
+volumes:
+  mongodb-data:
